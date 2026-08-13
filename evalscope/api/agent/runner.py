@@ -100,6 +100,7 @@ def run_agent_loop(
                     max_steps=max_steps,
                 )
                 trace = AgentTrace(
+                    framework='native',
                     strategy=trace_strategy_name,
                     environment=trace_env_name,
                     max_steps=max_steps,

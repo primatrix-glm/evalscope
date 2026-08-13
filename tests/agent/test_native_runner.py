@@ -232,17 +232,18 @@ description: Demo skill.
 
 def test_run_agent_loop_can_leave_caller_owned_environment_open(monkeypatch: pytest.MonkeyPatch) -> None:
     env = FakeEnvironment()
+    seen: Dict[str, Any] = {}
 
     class FakeLoop:
 
-        def __init__(self, **_: Any) -> None:
-            pass
+        def __init__(self, **kwargs: Any) -> None:
+            seen.update(kwargs)
 
         async def run(self, ctx: Any) -> AgentLoopResult:
             return AgentLoopResult(
                 messages=[ChatMessageAssistant(content='raw')],
                 final_output=_model_output('raw'),
-                trace=AgentTrace(strategy='fake', environment='fake', max_steps=1),
+                trace=seen['trace'],
             )
 
     monkeypatch.setattr('evalscope.api.agent.runner.AgentLoop', FakeLoop)
@@ -262,6 +263,9 @@ def test_run_agent_loop_can_leave_caller_owned_environment_open(monkeypatch: pyt
     )
 
     assert result.final_output.message.text == 'raw'
+    assert result.trace.framework == 'native'
+    assert result.trace.strategy == 'fake'
+    assert result.trace.environment == 'fake'
     assert env.closed == 0
 
 
