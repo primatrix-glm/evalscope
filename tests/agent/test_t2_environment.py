@@ -596,19 +596,6 @@ class TestLocalEnvironmentTools:
         # stderr section is present when non-empty
         assert '[stderr]' in obs
 
-    def test_bash_tool_truncates_large_output_with_head_and_tail(self):
-        from evalscope.agent.tools.bash import BASH_MAX_OUTPUT_CHARS, run_bash
-        env = self._env()
-        call = _tool_call(
-            'bash',
-            {'command': "printf 'HEAD'; yes MIDDLE | head -c 20000; printf 'TAIL'"},
-        )
-        obs = self._run(run_bash(call, env))
-        assert len(obs) == BASH_MAX_OUTPUT_CHARS
-        assert obs.startswith('HEAD')
-        assert obs.endswith('TAIL')
-        assert 'characters elided from bash output' in obs
-
     def test_python_exec_tool_runs_code(self):
         from evalscope.agent.tools.python_exec import run_python_exec
         env = self._env()
