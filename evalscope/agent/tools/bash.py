@@ -9,6 +9,8 @@ from evalscope.api.tool import ToolCall, ToolInfo
 from evalscope.api.tool.tool_info import ToolParams
 from evalscope.utils.json_schema import JSONSchema
 
+BASH_MAX_OUTPUT_CHARS = 10_000
+
 BASH_TOOL_INFO = ToolInfo(
     name='bash',
     description=(
@@ -101,7 +103,23 @@ def _format_exec_result(result: ExecResult) -> str:
         parts.append('[TIMEOUT]')
     elif result.returncode != 0:
         parts.append(f'[exit {result.returncode}]')
-    return '\n'.join(parts) if parts else '(no output)'
+    output = '\n'.join(parts) if parts else '(no output)'
+    return _truncate_middle(output, BASH_MAX_OUTPUT_CHARS)
 
 
-__all__ = ['run_bash', 'BASH_TOOL_INFO', 'apply_bash_command_timeout_defaults']
+def _truncate_middle(output: str, max_chars: int) -> str:
+    """Bound a tool observation while retaining both command output edges."""
+    if len(output) <= max_chars:
+        return output
+    marker = ''
+    for _ in range(3):
+        retained_chars = max_chars - len(marker)
+        omitted_chars = len(output) - retained_chars
+        marker = f'\n... [{omitted_chars} characters elided from bash output] ...\n'
+    retained_chars = max_chars - len(marker)
+    head_chars = retained_chars // 2
+    tail_chars = retained_chars - head_chars
+    return output[:head_chars] + marker + output[-tail_chars:]
+
+
+__all__ = ['run_bash', 'BASH_TOOL_INFO', 'BASH_MAX_OUTPUT_CHARS', 'apply_bash_command_timeout_defaults']

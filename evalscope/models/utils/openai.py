@@ -714,6 +714,7 @@ def openai_handle_bad_request(model_name: str, e: APIStatusError) -> Union[Model
         msg = (content or '').lower()
         if any(p in msg for p in (
             'input length',
+            'context length',
             'maximum context length',
             'context window',
             'too many tokens',

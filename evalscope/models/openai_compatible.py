@@ -11,7 +11,7 @@ from evalscope.api.model import ChatCompletionChoice, GenerateConfig, ModelAPI, 
 from evalscope.api.tool import ToolChoice, ToolInfo
 from evalscope.utils import get_logger
 from evalscope.utils.argument_utils import get_supported_params
-from evalscope.utils.function_utils import async_retry_call, retry_call
+from evalscope.utils.function_utils import async_retry_call, retry_call, retry_on_transient_http_error
 from .utils.async_client import LoopBoundAsyncClientPool
 from .utils.openai import (
     async_collect_stream_response,
@@ -134,6 +134,7 @@ class OpenAICompatibleAPI(ModelAPI):
                 _create_and_collect,
                 retries=config.retries,
                 sleep_interval=config.retry_interval,
+                retry_if=retry_on_transient_http_error,
             )
 
             total_time = time.monotonic() - t_start
@@ -212,6 +213,7 @@ class OpenAICompatibleAPI(ModelAPI):
                 _create_and_collect,
                 retries=config.retries,
                 sleep_interval=config.retry_interval,
+                retry_if=retry_on_transient_http_error,
             )
 
             total_time = time.monotonic() - t_start

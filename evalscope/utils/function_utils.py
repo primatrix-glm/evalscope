@@ -68,12 +68,28 @@ def run_once(func: Callable[..., T]) -> Callable[..., T]:
     return wrapper
 
 
-def retry_call(func, *args, retries=3, sleep_interval=0, **kwargs):
+def retry_on_transient_http_error(exc: Exception) -> bool:
+    """Retry connection failures, throttling, and transient HTTP statuses only."""
+    status_code = getattr(exc, 'status_code', None)
+    if status_code is None:
+        status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
+    if status_code is None:
+        return True
+    try:
+        status_code = int(status_code)
+    except (TypeError, ValueError):
+        return True
+    return status_code in (408, 409, 425, 429) or status_code >= 500
+
+
+def retry_call(func, *args, retries=3, sleep_interval=0, retry_if=None, **kwargs):
     """Function that retries a function call up to `retries` times if an exception occurs."""
     for attempt in range(retries):
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            if retry_if is not None and not retry_if(e):
+                raise
             if attempt < retries - 1:
                 if sleep_interval > 0:
                     logger.warning(f'Attempt {attempt + 1} / {retries} failed: {e}. Retrying...')
@@ -83,13 +99,20 @@ def retry_call(func, *args, retries=3, sleep_interval=0, **kwargs):
 
 
 async def async_retry_call(
-    func: Callable[..., Awaitable[T]], *args, retries: int = 3, sleep_interval: float = 0, **kwargs
+    func: Callable[..., Awaitable[T]],
+    *args,
+    retries: int = 3,
+    sleep_interval: float = 0,
+    retry_if: Optional[Callable[[Exception], bool]] = None,
+    **kwargs,
 ) -> T:
     """Async version of retry_call. Retries an async function call up to `retries` times if an exception occurs."""
     for attempt in range(retries):
         try:
             return await func(*args, **kwargs)
         except Exception as e:
+            if retry_if is not None and not retry_if(e):
+                raise
             if attempt < retries - 1:
                 if sleep_interval > 0:
                     logger.warning(f'Attempt {attempt + 1} / {retries} failed: {e}. Retrying...')

@@ -6,10 +6,46 @@ from typing import AsyncGenerator
 
 from evalscope.utils import asyncio_runtime
 from evalscope.utils.asyncio_runtime import AsyncioLoopRunner, AsyncioLoopThread, cancel_and_wait
+from evalscope.utils.function_utils import async_retry_call, retry_call, retry_on_transient_http_error
 
 
 async def _current_loop() -> asyncio.AbstractEventLoop:
     return asyncio.get_running_loop()
+
+
+def test_retry_call_does_not_retry_permanent_http_error() -> None:
+    attempts = 0
+
+    class BadRequest(Exception):
+        status_code = 400
+
+    def fail() -> None:
+        nonlocal attempts
+        attempts += 1
+        raise BadRequest('bad request')
+
+    with pytest.raises(BadRequest):
+        retry_call(fail, retries=5, retry_if=retry_on_transient_http_error)
+    assert attempts == 1
+
+
+def test_async_retry_call_retries_transient_http_error() -> None:
+    attempts = 0
+
+    class Throttled(Exception):
+        status_code = 429
+
+    async def flaky() -> str:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise Throttled('slow down')
+        return 'ok'
+
+    assert asyncio.run(
+        async_retry_call(flaky, retries=5, retry_if=retry_on_transient_http_error)
+    ) == 'ok'
+    assert attempts == 3
 
 
 def test_cancel_and_wait_observes_completed_task_failure() -> None:
